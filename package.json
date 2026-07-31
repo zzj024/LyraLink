@@ -1,0 +1,62 @@
+{
+  "name": "link-audio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A local-first desktop app for importing, organizing, editing and syncing authorized audio.",
+  "main": "dist/main/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --watch",
+    "start": "electron .",
+    "test": "npm run build && node --test dist/tests/*.test.js && python -m unittest discover -s ai -p \"test_*.py\"",
+    "check": "tsc --noEmit",
+    "prepare:offline": "powershell -ExecutionPolicy Bypass -File scripts/prepare-offline-runtime.ps1",
+    "dist:win": "npm run build && electron-builder --win nsis"
+  },
+  "dependencies": {
+    "youtube-dl-exec": "^3.0.24"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "electron": "^37.0.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  },
+  "allowScripts": {},
+  "build": {
+    "appId": "local.linkaudio.app",
+    "productName": "LinkAudio",
+    "artifactName": "LinkAudio-Setup-${version}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "icon": "resources/icon.ico",
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "files": [
+      "dist/**/*",
+      "package.json",
+      "node_modules/youtube-dl-exec/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/offline",
+        "to": "offline"
+      }
+    ],
+    "asarUnpack": [
+      "**/*.exe",
+      "**/*.pyd",
+      "**/*.dll"
+    ]
+  }
+}

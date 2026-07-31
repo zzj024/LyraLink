@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' https: file: data:; media-src 'self' file:; style-src 'self'; script-src 'self'"
+    />
+    <title>LinkAudio</title>
+    <link rel="icon" href="./icon.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar legacy-topbar" aria-hidden="true">
+        <button id="nav-back" tabindex="-1">返回</button>
+        <button id="nav-forward" tabindex="-1">前进</button>
+        <button class="topbar-settings" data-view="settings" tabindex="-1">设置</button>
+      </header>
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">L</span>
+          <div><strong>LinkAudio</strong><small>私人声音收藏夹</small></div>
+        </div>
+        <nav>
+          <button class="nav-item active" data-view="library" data-collection="all" title="音乐库"><span>♫</span><b>音乐库</b></button>
+          <button class="nav-item" data-view="library" data-collection="favorites" title="我喜欢的音乐"><span>♥</span><b>我喜欢的音乐</b></button>
+          <div class="folder-heading playlist-heading"><span>我的歌单</span><button id="create-playlist" title="新建歌单" aria-label="新建歌单">＋</button></div>
+          <div id="playlist-nav" class="folder-nav"></div>
+          <div class="folder-heading audio-folder-heading"><span>我的文件夹</span><button id="create-folder" title="新建文件夹" aria-label="新建文件夹">＋</button></div>
+          <div id="folder-nav" class="folder-nav"></div>
+          <button class="nav-item settings-nav-item" data-view="settings" title="设置"><span>⚙</span><b>设置</b></button>
+          <button class="nav-item trash-nav-item" data-view="library" data-collection="trash" title="回收站"><span>♲</span><b>回收站</b></button>
+        </nav>
+        <button id="sidebar-toggle" class="sidebar-toggle" aria-label="收起侧栏"><span>«</span><b>收起侧栏</b></button>
+      </aside>
+
+      <main>
+        <section id="import-view" class="view">
+          <header>
+            <p class="eyebrow">导入在线音频</p>
+            <h1>导入你喜欢的音频</h1>
+            <p class="subtitle">粘贴哔哩哔哩视频链接或分享文案，自动提取音频。也支持导入本地文件。</p>
+          </header>
+
+          <div class="import-card">
+            <label for="link-input">视频链接或分享文案</label>
+            <textarea id="link-input" rows="4" placeholder="例如：https://www.bilibili.com/video/BV..."></textarea>
+            <div class="supported">
+              <span class="platform bilibili">B</span><span>哔哩哔哩</span>
+            </div>
+            <div class="actions">
+              <button id="import-local-button" class="button secondary">导入本地音频</button>
+              <button id="import-button" class="button primary" disabled>导入音频 <span>→</span></button>
+            </div>
+            <div id="status" class="status hidden" role="status">
+              <span class="status-dot"></span><span id="status-text"></span>
+            </div>
+          </div>
+
+          <article id="preview" class="preview hidden">
+            <img id="preview-cover" alt="" />
+            <div>
+              <span id="preview-platform" class="source-label"></span>
+              <h2 id="preview-title"></h2>
+              <p id="preview-meta"></p>
+            </div>
+          </article>
+          <section id="active-downloads-card" class="import-card hidden">
+            <div class="lyrics-header">
+              <div><p class="eyebrow">处理记录</p><h2>任务记录</h2></div>
+              <button id="clear-task-history" class="button secondary">清空记录</button>
+            </div>
+            <div id="task-history" class="task-history"></div>
+          </section>
+        </section>
+
+        <section id="library-view" class="view active">
+          <header class="library-header">
+            <div><p class="eyebrow">保存在这台电脑上</p><h1 id="library-title">我的音频</h1></div>
+            <div class="library-header-tools">
+              <div class="search-shell">
+                <label class="global-search">
+                  <span>⌕</span>
+                  <input id="library-search" type="search" placeholder="搜索歌曲或歌手" />
+                </label>
+                <div id="global-search-results" class="global-search-results hidden"></div>
+              </div>
+              <span id="track-count" class="count">0 首</span>
+            </div>
+          </header>
+          <div id="library-toolbar" class="library-toolbar">
+            <button id="play-all" class="button primary">▶ 播放全部</button>
+            <button id="library-import-local" class="button secondary">＋ 导入本地</button>
+            <button id="library-import-folder" class="button secondary">导入文件夹</button>
+            <button id="library-import-link" class="button secondary">链接导入</button>
+            <span class="toolbar-spacer"></span>
+            <select id="library-sort" aria-label="排序">
+              <option value="newest">最近导入</option>
+              <option value="title">按歌名</option>
+              <option value="author">按歌手</option>
+              <option value="duration">按时长</option>
+            </select>
+          </div>
+          <div id="bulk-toolbar" class="bulk-toolbar hidden">
+            <label class="bulk-select-all"><input id="bulk-select-all" type="checkbox" /> 全选</label>
+            <span id="bulk-count">未选择歌曲</span>
+            <span class="bulk-separator"></span>
+            <button id="bulk-favorite" title="将选中歌曲标记为喜欢">加入喜欢</button>
+            <select id="bulk-folder" title="选择要加入的文件夹"><option value="">选择文件夹</option></select>
+            <button id="bulk-add-folder" title="将选中歌曲加入上方选择的文件夹">加入文件夹</button>
+            <select id="bulk-playlist" title="选择要加入的歌单"><option value="">选择歌单</option></select>
+            <button id="bulk-add-playlist" title="将选中歌曲加入上方选择的歌单">加入歌单</button>
+            <span class="bulk-separator"></span>
+            <button id="bulk-restore" title="将选中歌曲从回收站恢复">恢复所选</button>
+            <button id="bulk-delete" class="danger-text" title="将选中歌曲移入回收站">移入回收站</button>
+          </div>
+          <div id="track-list-header" class="track-list-header">
+            <span><input id="header-select-all" type="checkbox" aria-label="选择当前列表全部歌曲" /></span><span>#</span><span></span><span>歌曲</span><span>歌手</span>
+            <span>来源</span><span>时长</span><span class="track-actions-heading">操作</span>
+          </div>
+          <div id="track-list" class="track-list"></div>
+          <div id="empty-library" class="empty">
+            <span id="empty-library-icon">♫</span><h2 id="empty-library-title">还没有导入音频</h2><p id="empty-library-copy">导入第一首本地音乐或哔哩哔哩音频。</p>
+          </div>
+        </section>
+
+        <section id="settings-view" class="view">
+          <header>
+            <h1>设置</h1>
+            <p class="subtitle">调整应用行为、音乐库和本地数据。</p>
+          </header>
+          <div class="settings-layout">
+            <nav class="settings-sections" aria-label="设置分类">
+              <button class="active" data-settings-section="general" aria-current="page">通用</button>
+              <button data-settings-section="playback">播放</button>
+              <button data-settings-section="library">音乐库</button>
+              <button disabled title="该分类将在后续版本提供">歌词 <small>即将提供</small></button>
+            </nav>
+            <div class="import-card settings-card" id="settings-general">
+            <h2>通用设置</h2>
+            <label class="field-label">外观主题
+              <select id="settings-theme">
+                <option value="light">浅色</option>
+                <option value="dark">深色</option>
+              </select>
+            </label>
+            <label class="consent settings-consent">
+              <input id="settings-authorization" type="checkbox" />
+              <span>我确认自己有权保存和处理该内容，且内容不受付费、会员、私密或 DRM 限制。</span>
+            </label>
+            <label class="field-label">回收站保留天数（0 表示不自动清理）
+              <input id="settings-trash-days" type="number" min="0" max="3650" value="30" />
+            </label>
+            <div class="actions">
+              <button id="save-settings" class="button primary">保存设置</button>
+              <button id="backup-library" class="button secondary">备份音乐库</button>
+              <button id="restore-library" class="button secondary">恢复音乐库</button>
+              <button id="clean-trash" class="button secondary">清理过期回收站</button>
+            </div>
+            <p class="modal-hint">当前版本 0.1.0。自动更新将在确定正式发布地址后启用。</p>
+            <p class="modal-hint">音乐、封面、歌词和设置默认只保存在本机，应用不会上传这些内容。</p>
+            <div id="settings-status" class="status hidden" role="status">
+              <span class="status-dot"></span><span id="settings-status-text"></span>
+            </div>
+            </div>
+            <div class="import-card settings-card hidden" id="settings-playback">
+            <h2>播放设置</h2>
+            <label class="field-label">默认播放模式
+              <select id="settings-play-mode">
+                <option value="list">列表循环</option>
+                <option value="repeat">单曲循环</option>
+                <option value="shuffle">随机播放</option>
+              </select>
+            </label>
+            <label class="consent settings-consent" style="margin-top:16px">
+              <input id="settings-remember-volume" type="checkbox" />
+              <span>记住上次音量设置</span>
+            </label>
+            <div class="actions">
+              <button id="save-settings-playback" class="button primary">保存设置</button>
+            </div>
+            </div>
+            <div class="import-card settings-card hidden" id="settings-library">
+            <h2>音乐库设置</h2>
+            <label class="field-label">默认排序方式
+              <select id="settings-default-sort">
+                <option value="newest">最近导入</option>
+                <option value="title">按歌名</option>
+                <option value="author">按歌手</option>
+                <option value="duration">按时长</option>
+              </select>
+            </label>
+            <label class="consent settings-consent" style="margin-top:16px">
+              <input id="settings-show-source" type="checkbox" />
+              <span>歌曲列表显示"来源"列</span>
+            </label>
+            <div class="actions">
+              <button id="save-settings-library" class="button primary">保存设置</button>
+            </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="detail-view" class="view detail-view">
+          <div class="detail-topbar">
+            <div>
+              <button id="back-to-library" class="back-button">← 音乐库</button>
+              <h1 id="detail-title"></h1>
+              <p id="detail-meta" class="subtitle"></p>
+              <span id="detail-source" class="source-label">哔哩哔哩</span>
+            </div>
+            <div class="detail-actions">
+              <button id="detail-play" class="button primary">▶ 播放</button>
+              <button id="detail-more-toggle" class="button secondary icon-more" aria-label="更多操作" aria-controls="detail-more-menu">•••</button>
+              <div id="detail-more-menu" class="detail-more-menu hidden" role="menu">
+                <button id="edit-lyrics" role="menuitem">编辑歌词</button>
+                <button id="import-lrc" role="menuitem">导入 LRC 歌词</button>
+                <hr />
+                <button id="song-info-toggle" role="menuitem">查看歌曲信息</button>
+                <button id="edit-track" role="menuitem">编辑信息</button>
+                <button id="split-track" role="menuitem">裁切 / 拆分</button>
+                <hr />
+                <button id="export-track" role="menuitem">导出音频</button>
+                <button id="export-lrc" role="menuitem">导出 LRC</button>
+                <button id="reveal-track" role="menuitem">打开位置</button>
+                <button id="delete-track-detail" class="danger-text" role="menuitem">移入回收站</button>
+              </div>
+            </div>
+          </div>
+
+          <section id="vinyl-stage" class="vinyl-stage">
+            <button id="vinyl-record" class="vinyl-record" aria-label="显示歌词">
+              <span class="vinyl-cover"><img id="detail-cover" alt="" /></span>
+              <span class="vinyl-hole"></span>
+            </button>
+          </section>
+
+          <section id="detail-lyrics-panel" class="lyrics-panel immersive-lyrics">
+            <div class="immersive-layout">
+              <aside class="immersive-art" aria-label="当前歌曲">
+                <button id="back-to-vinyl" class="immersive-disc" aria-label="返回唱片">
+                  <span><img id="lyrics-cover" alt="" /></span>
+                  <i></i>
+                </button>
+                <div class="immersive-song-copy">
+                  <strong id="lyrics-song-title"></strong>
+                  <small id="lyrics-song-author"></small>
+                </div>
+                <div class="immersive-equalizer" aria-hidden="true">
+                  <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                </div>
+              </aside>
+              <div class="immersive-copy">
+                <div id="lyrics-empty" class="empty compact">
+                  <span>词</span><h2>暂时没有歌词</h2>
+                  <p>粘贴歌词，然后跟随音乐按空格完成同步。</p>
+                  <button id="empty-add-lyrics" class="button primary">添加歌词</button>
+                </div>
+                <div id="lyrics-lines" class="lyrics-lines hidden"></div>
+              </div>
+            </div>
+          </section>
+
+          <aside id="song-info-panel" class="song-info-panel hidden" role="dialog" aria-label="歌曲信息">
+            <div class="song-info-header"><h2>歌曲信息</h2><button id="song-info-close" aria-label="关闭">×</button></div>
+            <dl>
+              <div><dt>歌名</dt><dd id="song-info-title"></dd></div>
+              <div><dt>歌手</dt><dd id="song-info-author"></dd></div>
+              <div><dt>来源</dt><dd id="song-info-source"></dd></div>
+              <div><dt>时长</dt><dd id="song-info-duration"></dd></div>
+            </dl>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <div id="confirm-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <div class="modal-card compact-modal">
+        <p class="eyebrow" id="confirm-eyebrow">确认操作</p>
+        <h2 id="confirm-title"></h2>
+        <p id="confirm-message" class="modal-hint"></p>
+        <div class="actions">
+          <button id="confirm-cancel" class="button secondary">取消</button>
+          <button id="confirm-ok" class="button primary">确认</button>
+        </div>
+      </div>
+    </div>
+    <div id="app-toast" class="app-toast hidden" role="status" aria-live="polite"></div>
+    <footer id="player" class="player">
+      <div class="now-playing"><div class="mini-cover"><img id="player-cover" alt="" /></div><div><strong id="player-title">暂未播放歌曲</strong><small id="player-author">从音乐库选择一首歌曲</small></div></div>
+      <div class="player-center">
+        <div class="player-buttons">
+          <button id="player-previous" aria-label="上一首" disabled>⏮</button>
+          <button id="player-toggle" class="main-play" aria-label="播放" disabled>▶</button>
+          <button id="player-next" aria-label="下一首" disabled>⏭</button>
+          <button id="player-mode" title="播放模式">列表循环</button>
+        </div>
+        <audio id="audio"></audio>
+        <div class="player-progress">
+          <span id="player-current">00:00</span>
+          <input id="player-seek" type="range" min="0" max="1" step="0.1" value="0" aria-label="播放进度" disabled />
+          <span id="player-duration">00:00</span>
+        </div>
+      </div>
+      <div class="player-tools">
+        <span class="volume-label">音量</span>
+        <input id="player-volume" type="range" min="0" max="1" step="0.02" value="1" aria-label="音量" />
+        <button id="player-lyrics-open" aria-label="打开歌词" disabled>词</button>
+        <button id="player-queue-toggle" aria-label="打开播放队列">☷</button>
+      </div>
+    </footer>
+    <aside id="play-queue-panel" class="play-queue-panel hidden" aria-label="播放队列">
+      <header>
+        <div><h2>播放队列</h2><small id="play-queue-count">0 首</small></div>
+        <div><button id="play-queue-clear">清除待播</button><button id="play-queue-close" aria-label="关闭">×</button></div>
+      </header>
+      <div id="play-queue-list" class="play-queue-list"></div>
+      <div id="play-queue-empty" class="queue-empty">播放队列是空的</div>
+    </aside>
+
+    <div id="folder-modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card compact-modal">
+        <p class="eyebrow">整理音乐库</p>
+        <h2>新建文件夹</h2>
+        <label class="field-label">文件夹名称<input id="folder-name-input" data-autofocus type="text" maxlength="40" placeholder="例如：通勤、古风、待整理" /></label>
+        <p id="folder-error" class="form-error hidden"></p>
+        <div class="actions">
+          <button id="folder-cancel" class="button secondary">取消</button>
+          <button id="folder-save" class="button primary">创建文件夹</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="playlist-modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card compact-modal">
+        <p class="eyebrow">按顺序播放</p>
+        <h2>新建歌单</h2>
+        <label class="field-label">名称<input id="playlist-name-input" data-autofocus type="text" maxlength="40" placeholder="例如：跑步、学习、睡前" /></label>
+        <p id="playlist-error" class="form-error hidden"></p>
+        <div class="actions">
+          <button id="playlist-cancel" class="button secondary">取消</button>
+          <button id="playlist-save" class="button primary">创建</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="playlist-picker-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="playlist-picker-title">
+      <div class="modal-card compact-modal playlist-picker-card">
+        <p class="eyebrow">整理音乐</p>
+        <h2 id="playlist-picker-title">收藏到歌单</h2>
+        <p id="playlist-picker-track" class="modal-hint"></p>
+        <div id="playlist-picker-options" class="playlist-picker-options"></div>
+        <p id="playlist-picker-error" class="form-error hidden"></p>
+        <div class="actions">
+          <button id="playlist-picker-new" class="button secondary">＋ 新建歌单</button>
+          <button id="playlist-picker-cancel" class="button secondary">取消</button>
+          <button id="playlist-picker-save" class="button primary">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="track-editor-modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card compact-modal">
+        <p class="eyebrow">歌曲信息</p>
+        <h2>编辑音频</h2>
+        <label class="field-label">名称<input id="track-title-input" type="text" /></label>
+        <label class="field-label">歌手<input id="track-author-input" type="text" /></label>
+        <label class="favorite-check"><input id="track-favorite-input" type="checkbox" /> 加入喜欢</label>
+        <fieldset class="folder-picker"><legend>放入文件夹</legend><div id="track-folder-options"></div></fieldset>
+        <div class="cover-editor">
+          <img id="track-cover-preview" alt="" />
+          <button id="choose-cover" class="button secondary">更换封面</button>
+        </div>
+        <div id="cover-crop-controls" class="hidden">
+          <label class="field-label">缩放<input id="cover-zoom" type="range" min="1" max="3" step="0.05" value="1" /></label>
+          <label class="field-label">水平位置<input id="cover-x" type="range" min="-100" max="100" step="1" value="0" /></label>
+          <label class="field-label">垂直位置<input id="cover-y" type="range" min="-100" max="100" step="1" value="0" /></label>
+        </div>
+        <p id="track-editor-error" class="form-error hidden"></p>
+        <div class="actions">
+          <button id="track-editor-cancel" class="button secondary">取消</button>
+          <button id="track-editor-save" class="button primary">保存信息</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="split-modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card timeline-modal">
+        <div id="split-timeline-step">
+          <p class="eyebrow">第一步 · 整理片段</p>
+          <h2>裁切或拆分歌曲</h2>
+          <p class="modal-hint">空格播放或暂停，Enter 在播放头位置切开。点击片段选中后，可以删除不需要的部分。这里只记录剪辑方案，不会修改音频文件。</p>
+          <div class="timeline-transport">
+            <button id="split-preview-play" class="review-play-button" aria-label="播放" title="播放或暂停">▶</button>
+            <span id="split-preview-time">00:00.0</span>
+            <span class="timeline-duration">/ <span id="split-total-time">00:00.0</span></span>
+          </div>
+          <canvas id="waveform-canvas" class="waveform-canvas" width="1200" height="120" aria-label="音频波形"></canvas>
+          <input id="split-preview-seek" class="timeline-seek" type="range" min="0" max="1" step="0.05" value="0" />
+          <div id="audio-timeline" class="audio-timeline" aria-label="音频片段时间轴">
+            <div id="timeline-segments" class="timeline-segments"></div>
+            <div id="timeline-playhead" class="timeline-playhead"></div>
+          </div>
+          <div class="timeline-selection">
+            <div><span>当前片段</span><strong id="selected-segment-range">00:00.0 — 00:00.0</strong></div>
+            <button id="split-at-playhead" class="button secondary">在播放头切开 <kbd>Enter</kbd></button>
+            <button id="split-undo" class="button secondary">撤销</button>
+            <button id="split-redo" class="button secondary">重做</button>
+            <button id="delete-segment" class="button danger">删除选中片段</button>
+          </div>
+          <div class="timeline-precision">
+            <button id="nudge-back-large">−0.5s</button><button id="nudge-back">−0.1s</button>
+            <label>播放头 <input id="playhead-time-input" type="number" min="0" step="0.01" /></label>
+            <button id="nudge-forward">+0.1s</button><button id="nudge-forward-large">+0.5s</button>
+            <label>缩放 <input id="timeline-zoom" type="range" min="1" max="8" step="1" value="1" /></label>
+          </div>
+          <div class="shortcut-list timeline-shortcuts">
+            <span><kbd>Space</kbd> 播放 / 暂停</span>
+            <span><kbd>Enter</kbd> 切开</span>
+            <span><kbd>Delete</kbd> 删除片段</span>
+            <span>点击片段可选择并试听</span>
+          </div>
+          <p id="split-error" class="form-error hidden"></p>
+          <div class="actions">
+            <button id="split-cancel" class="button secondary">取消</button>
+            <button id="split-next" class="button primary">下一步：编辑信息</button>
+          </div>
+        </div>
+        <div id="split-metadata-step" class="hidden">
+          <p class="eyebrow">第二步 · 确认信息</p>
+          <h2>编辑每个片段</h2>
+          <p class="modal-hint">每个保留片段都会生成一首新歌曲。默认沿用原封面和歌手，可分别修改歌名与歌手。</p>
+          <div id="segment-metadata-list" class="segment-metadata-list"></div>
+          <label class="quality-choice">裁切方式
+            <select id="split-quality">
+              <option value="accurate">精确裁切（AAC 256kbps）</option>
+              <option value="fast">快速无损裁切（切点可能略有偏差）</option>
+            </select>
+          </label>
+          <p id="split-metadata-error" class="form-error hidden"></p>
+          <div id="split-task-status" class="ai-status hidden">
+            <span class="status-dot"></span>
+            <div class="ai-status-content">
+              <div class="ai-status-heading"><span id="split-task-text"></span><strong id="split-task-percent">0%</strong></div>
+              <div class="ai-progress-track"><div id="split-task-bar" class="ai-progress-bar"></div></div>
+            </div>
+          </div>
+          <div class="actions">
+            <button id="split-back" class="button secondary">返回时间轴</button>
+            <button id="split-save" class="button primary">确认并生成全部片段</button>
+            <button id="split-cancel-task" class="button danger hidden">取消生成</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="lyrics-modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card lyrics-workbench">
+        <header class="lyrics-workbench-header">
+          <div class="lyrics-workbench-song">
+            <span class="lyrics-workbench-cover">词</span>
+            <div><strong id="lyrics-workbench-title"></strong><small>歌词工作台</small></div>
+          </div>
+          <div class="lyrics-workbench-steps" aria-label="歌词匹配步骤">
+            <span id="lyrics-step-text" class="active">1 歌词</span>
+            <span id="lyrics-step-match">2 匹配</span>
+            <span id="lyrics-step-review">3 校对</span>
+          </div>
+          <button class="button secondary modal-cancel">退出</button>
+        </header>
+        <div id="paste-step">
+          <div class="lyrics-workbench-main">
+            <section class="lyrics-workbench-content">
+              <h2>歌词</h2>
+              <p class="modal-hint">每句歌词单独一行。空行、LRC 时间标签和常见网页序号会自动清理。</p>
+              <textarea id="lyrics-input" data-autofocus rows="13" placeholder="把歌词粘贴到这里…"></textarea>
+              <p id="line-count" class="line-count">0 行歌词</p>
+              <div id="ai-status" class="ai-status hidden">
+                <span class="status-dot"></span>
+                <div class="ai-status-content">
+                  <div class="ai-status-heading">
+                    <span id="ai-status-text"></span><strong id="ai-progress-percent">0%</strong>
+                  </div>
+                  <div class="ai-progress-track"><div id="ai-progress-bar" class="ai-progress-bar"></div></div>
+                </div>
+              </div>
+              <button id="cancel-ai" class="button danger hidden">取消智能匹配</button>
+            </section>
+            <aside class="lyrics-workbench-tools">
+              <h2>匹配方式</h2>
+              <div class="workbench-tool">
+                <strong>智能匹配</strong>
+                <p>分析音频和歌词，自动生成逐句时间。</p>
+                <button id="ai-align" class="button primary">开始智能匹配</button>
+              </div>
+              <div class="workbench-tool">
+                <strong>手动打点</strong>
+                <p>播放歌曲，按空格记录每句开始时间。</p>
+                <button id="start-sync" class="button secondary">使用手动模式</button>
+              </div>
+            </aside>
+          </div>
+        </div>
+        <div id="sync-step" class="hidden">
+          <p class="eyebrow">第二步</p>
+          <h2>跟随音乐打点</h2>
+          <div class="sync-instructions">
+            <p>第一句开始时按空格，此后只在下一句真正开始时再按。当前句会一直停留到下一次打点。</p>
+            <div class="shortcut-list">
+              <span><kbd>Space</kbd> 标记句首</span>
+              <span><kbd>Backspace</kbd> 撤销</span>
+              <span><kbd>←</kbd><kbd>→</kbd> 前后移动 2 秒</span>
+            </div>
+          </div>
+          <div class="sync-progress">
+            <span id="sync-position">0 / 0</span>
+            <span><span id="sync-time">00:00.0</span> / <span id="sync-duration">00:00.0</span></span>
+          </div>
+          <div class="sync-player-controls">
+            <button id="sync-toggle-play" class="sync-toggle-play">暂停</button>
+            <input id="sync-seek" class="sync-seek" type="range" min="0" max="1" step="0.1" value="0" aria-label="歌曲进度" />
+          </div>
+          <div class="sync-lines">
+            <p id="sync-current" class="current"></p>
+            <div id="sync-upcoming" class="sync-upcoming"></div>
+          </div>
+          <button id="tap-line" class="tap-button">唱到这句开头时，按空格</button>
+          <div class="actions">
+            <button id="sync-back" class="button secondary">返回修改</button>
+            <button id="undo-sync" class="button secondary">撤销上一句</button>
+            <button id="save-lyrics" class="button primary">保存歌词</button>
+          </div>
+        </div>
+        <div id="review-step" class="hidden">
+          <p class="eyebrow">AI 匹配结果</p>
+          <h2>检查并微调</h2>
+          <p class="modal-hint">点击歌词即可从该句前 1 秒试听。橙色歌词是 AI 建议优先检查的内容。</p>
+          <div class="review-toolbar">
+            <button id="review-toggle-play" class="review-play-button" aria-label="播放">▶</button>
+            <input id="review-seek" class="sync-seek" type="range" min="0" max="1" step="0.05" value="0" aria-label="试听进度" />
+            <span id="review-time">00:00.0</span>
+          </div>
+          <div class="review-offset">
+            <span>整首歌词</span>
+            <button id="shift-all-earlier">整体早 0.5 秒</button>
+            <button id="shift-all-later">整体晚 0.5 秒</button>
+          </div>
+          <div id="review-lines" class="review-lines"></div>
+          <div id="review-editor" class="review-editor hidden">
+            <strong id="review-current-text"></strong>
+            <span id="review-current-time">00:00.0</span>
+            <div>
+              <button id="review-earlier">早 0.2 秒</button>
+              <button id="review-set-current">设为当前播放位置</button>
+              <button id="review-later">晚 0.2 秒</button>
+            </div>
+          </div>
+          <div class="shortcut-list review-shortcuts">
+            <span><kbd>Space</kbd> 当前句打点并选择下一句</span>
+            <span><kbd>←</kbd><kbd>→</kbd> 微调 0.2 秒</span>
+            <span><kbd>Enter</kbd> 设为当前位置</span>
+          </div>
+          <div class="actions">
+            <button id="review-cancel" class="button secondary">取消修改</button>
+            <button id="restore-lyrics-version" class="button secondary hidden">恢复上次保存</button>
+            <button id="review-realign" class="button secondary">再次智能匹配</button>
+            <button id="review-manual" class="button secondary">改用手动打点</button>
+            <button id="review-save" class="button primary">保存调整</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
