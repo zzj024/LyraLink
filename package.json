@@ -27,8 +27,8 @@
   "allowScripts": {},
   "build": {
     "appId": "local.linkaudio.app",
-    "productName": "LinkAudio",
-    "artifactName": "LinkAudio-Setup-${version}.${ext}",
+    "productName": "LyraLink",
+    "artifactName": "LyraLink-Setup-${version}.${ext}",
     "directories": {
       "output": "release"
     },

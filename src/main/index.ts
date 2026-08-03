@@ -208,7 +208,7 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle("library:restore-backup", async () => {
     const result = await dialog.showOpenDialog({
-      title: "选择 LinkAudio 备份文件夹",
+      title: "选择 LyraLink 备份文件夹",
       properties: ["openDirectory"]
     });
     if (result.canceled || !result.filePaths[0]) return false;
