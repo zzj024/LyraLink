@@ -1,5 +1,6 @@
 import argparse
 import json
+import random
 import re
 import sys
 import unicodedata
@@ -90,39 +91,114 @@ def sequence_mapping(expected_text, recognized_text):
     return mapping
 
 
-def align_lines(lines, recognized, duration):
-    expected_chars = []
-    line_ranges = []
-    for line_index, text in enumerate(lines):
-        start_index = len(expected_chars)
-        expected_chars.extend({"char": char, "line": line_index} for char in normalize(text))
-        line_ranges.append((start_index, len(expected_chars)))
+def estimate_offset(whisper_times, lrc_times, threshold=1.5):
+    """Estimate timing offset using RANSAC.
 
-    expected_text = "".join(item["char"] for item in expected_chars)
-    recognized_text = "".join(item["char"] for item in recognized)
-    mapping = sequence_mapping(expected_text, recognized_text)
+    Given Whisper word start times and corresponding LRC ground-truth times,
+    compute the offset to add to Whisper times so they match LRC times.
 
-    raw_starts = []
-    confidences = []
-    for start_index, end_index in line_ranges:
-        matched = [mapping[index] for index in range(start_index, end_index) if index in mapping]
-        line_length = max(1, end_index - start_index)
-        coverage = len(matched) / line_length
-        # A single common character is not a reliable timing anchor. Treat weak
-        # matches as gaps and let neighboring reliable lines determine the time.
-        if matched and (len(matched) >= 2 or line_length == 1) and coverage >= 0.18:
-            times = [recognized[index]["start"] for index in matched]
-            probabilities = [recognized[index]["probability"] for index in matched]
-            raw_starts.append(min(times))
-            probability = sum(probabilities) / max(1, len(probabilities))
-            confidences.append(round(min(1.0, coverage * 0.75 + probability * 0.25), 3))
-        else:
-            raw_starts.append(None)
-            confidences.append(0.0)
+    Returns the offset value, or 0.0 if too few pairs.
+    """
+    if len(whisper_times) < 5 or len(whisper_times) != len(lrc_times):
+        return 0.0
 
-    # Fill every contiguous missing section as one interval. The old per-line
-    # fallback pushed long missing sections to the end of the track, causing many
-    # lyrics to collapse onto nearly the same timestamp.
+    offsets = sorted(lrc - w for w, lrc in zip(whisper_times, lrc_times))
+    n = len(offsets)
+
+    # Quick path: if the data is already tight, just return the median.
+    median = offsets[n // 2]
+    inliers = sum(1 for o in offsets if abs(o - median) < threshold)
+    if inliers / n > 0.8:
+        return median
+
+    # RANSAC
+    best_offset = median
+    best_inliers = inliers
+    sample_size = max(3, n // 3)
+
+    for _ in range(100):
+        sample = random.sample(offsets, sample_size)
+        candidate = sorted(sample)[len(sample) // 2]
+        count = sum(1 for o in offsets if abs(o - candidate) < threshold)
+        if count > best_inliers:
+            best_inliers = count
+            best_offset = candidate
+
+    return best_offset
+
+
+def _build_char_to_word_start(recognized):
+    """Map each recognized character index to the start time of its word."""
+    char_to_word_start = {}
+    word_start = 0.0
+    word_start_idx = -1
+    prev_end = 0.0
+    for i, char_info in enumerate(recognized):
+        if i == 0 or char_info["start"] > prev_end + 0.05:
+            if word_start_idx >= 0:
+                for j in range(word_start_idx, i):
+                    char_to_word_start[j] = word_start
+            word_start = char_info["start"]
+            word_start_idx = i
+        prev_end = char_info["end"]
+    for j in range(word_start_idx, len(recognized)):
+        char_to_word_start[j] = word_start
+    return char_to_word_start
+
+
+def align_lines(lines, recognized_words, duration, offset=0.0):
+    """Align known lyrics to Whisper word timestamps.
+
+    For each lyrics line, finds the best matching Whisper word after the
+    previous match (order enforcement for repeated lines).
+
+    recognized_words: list of Whisper word objects with .word, .start, .end,
+                      .probability attributes.
+    offset: timing offset to add (from estimate_offset / RANSAC).
+    """
+    n = len(lines)
+    raw_starts = [None] * n
+    confidences = [0.0] * n
+    prev_match_time = -1.0
+
+    for i, line_text in enumerate(lines):
+        line_norm = normalize(line_text)
+        if not line_norm:
+            continue
+
+        best_time = None
+        best_score = -1
+        best_prob = 0.0
+
+        for word in recognized_words:
+            word_start = float(word.start)
+            # Only consider words after the previous match.
+            if word_start < prev_match_time - 1.0:
+                continue
+            word_norm = normalize(word.word)
+            if not word_norm:
+                continue
+            score = 0
+            for j in range(min(len(line_norm), len(word_norm))):
+                if line_norm[j] == word_norm[j]:
+                    score += 1
+                else:
+                    break
+            if score >= 2 and score > best_score:
+                best_score = score
+                best_time = word_start
+                best_prob = float(word.probability or 0)
+
+        line_length = max(1, len(line_norm))
+        coverage = best_score / line_length
+        if best_time is not None and best_score >= 2 and coverage >= 0.18:
+            raw_starts[i] = best_time
+            prev_match_time = best_time
+            confidences[i] = round(min(1.0, coverage * 0.75 + best_prob * 0.25), 3)
+
+    # Fill every contiguous missing section as one interval.
+
+    # Fill every contiguous missing section as one interval.
     index = 0
     while index < len(raw_starts):
         if raw_starts[index] is not None:
@@ -137,18 +213,19 @@ def align_lines(lines, recognized, duration):
         left_time = float(raw_starts[previous]) if previous is not None else 0.0
         right_time = float(raw_starts[following]) if following is not None else duration
         count = run_end - run_start
-        for offset, line_index in enumerate(range(run_start, run_end)):
+        for off, line_index in enumerate(range(run_start, run_end)):
             if previous is None and following is not None:
-                ratio = offset / max(1, count)
+                ratio = off / max(1, count)
             elif previous is not None and following is not None:
-                ratio = (offset + 1) / (count + 1)
+                ratio = (off + 1) / (count + 1)
             else:
-                ratio = (offset + 1) / (count + 1)
+                ratio = (off + 1) / (count + 1)
             raw_starts[line_index] = left_time + max(0.0, right_time - left_time) * ratio
 
+    # Apply offset correction and build result.
     starts = []
     for value in raw_starts:
-        value = max(0.0, min(float(value), duration))
+        value = max(0.0, min(float(value) + offset, duration))
         if starts:
             value = max(value, starts[-1] + 0.05)
         starts.append(round(value, 3))
@@ -204,9 +281,8 @@ def main():
             if current_percent > last_percent:
                 progress(current_percent, f"正在识别人声… {current_percent}%")
                 last_percent = current_percent
-    recognized = expand_words(words)
     progress(92, "识别完成，正在将歌词与音频对齐…")
-    result = align_lines(lines, recognized, duration)
+    result = align_lines(lines, words, duration)
     progress(100, "AI 歌词匹配完成")
     print(json.dumps({
         "lines": result,

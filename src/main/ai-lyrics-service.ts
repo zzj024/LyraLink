@@ -16,7 +16,11 @@ function run(
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       windowsHide: true,
-      env: { ...process.env, PYTHONUTF8: "1" }
+      env: {
+        ...process.env,
+        PYTHONUTF8: "1",
+        PATH: `${path.dirname(command)}${path.delimiter}${process.env.PATH || ""}`
+      }
     });
     onChild?.(child);
     let stdout = "";
@@ -104,6 +108,15 @@ export class AiLyricsService {
     if (!track) throw new Error("没有找到要匹配歌词的音频。");
     if (!texts.length) throw new Error("请先粘贴歌词。");
 
+    console.log("[ai-align] 开始 AI 歌词匹配");
+    console.log("[ai-align] pythonPath:", this.pythonPath);
+    console.log("[ai-align] scriptPath:", this.scriptPath);
+    console.log("[ai-align] modelDirectory:", this.modelDirectory);
+    console.log("[ai-align] track.filePath:", track.filePath);
+    console.log("[ai-align] pythonPath exists:", existsSync(this.pythonPath));
+    console.log("[ai-align] scriptPath exists:", existsSync(this.scriptPath));
+    console.log("[ai-align] trackFile exists:", existsSync(track.filePath));
+
     await this.ensureRuntime();
     await mkdir(this.modelDirectory, { recursive: true });
     const tempDirectory = path.join(this.dataDirectory, "ai-temp");
@@ -155,16 +168,32 @@ export class AiLyricsService {
     } catch (error) {
       if (this.canceled) throw new Error("已取消 AI 歌词匹配。");
       const detail = error instanceof Error ? (error.stack || error.message) : String(error);
+      console.error("[ai-align] AI 匹配失败:", detail);
+      const errorLog = [
+        new Date().toISOString(),
+        "=== AI 匹配错误详情 ===",
+        "pythonPath: " + this.pythonPath,
+        "scriptPath: " + this.scriptPath,
+        "modelDirectory: " + this.modelDirectory,
+        "trackId: " + trackId,
+        "trackFile: " + track.filePath,
+        "pythonPath exists: " + existsSync(this.pythonPath),
+        "scriptPath exists: " + existsSync(this.scriptPath),
+        "trackFile exists: " + existsSync(track.filePath),
+        "",
+        "错误详情:",
+        detail
+      ].join("\n");
       await writeFile(
         path.join(this.dataDirectory, "ai-last-error.log"),
-        `${new Date().toISOString()}\n${detail}\n`,
+        errorLog,
         "utf8"
       );
       this.report({
         stage: "error",
-        message: `AI 匹配失败：${error instanceof Error ? error.message : String(error)}`
+        message: `AI 匹配失败：${detail}`
       });
-      throw error;
+      throw new Error(`AI 匹配失败：${detail}`);
     } finally {
       this.activeChild = null;
       await rm(lyricsPath, { force: true });

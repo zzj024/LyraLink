@@ -325,7 +325,9 @@ async function importAudio(): Promise<void> {
       const track = await window.linkAudio.importAudio({ input: requestedInput, taskId });
       showPreview(track);
     } catch (error) {
-      recordTask("导入音频失败", "error", friendlyError(error), taskId, requestedInput);
+      // Keep the actionable process error visible in the task history instead
+      // of requiring users to hover a generic failure label to see it.
+      recordTask(friendlyError(error), "error", undefined, taskId, requestedInput);
     }
   }));
   tracks = await window.linkAudio.listTracks();

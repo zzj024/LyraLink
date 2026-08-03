@@ -67,17 +67,32 @@ app.whenReady().then(async () => {
     (progress) => mainWindow?.webContents.send("media:progress", progress),
     existsSync(path.join(offlineDirectory, "bin", process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg"))
       ? path.join(offlineDirectory, "bin", process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg")
-      : "ffmpeg"
+      : "ffmpeg",
+    app.isPackaged
+      ? path.join(
+        process.resourcesPath,
+        "app.asar.unpacked",
+        "node_modules",
+        "youtube-dl-exec",
+        "bin",
+        process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp"
+      )
+      : path.join(process.cwd(), "node_modules", "youtube-dl-exec", "bin", process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp")
   );
   const audioEditService = new AudioEditService(
     library,
     (progress) => mainWindow?.webContents.send("media:progress", progress),
     path.join(offlineDirectory, "bin", process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg")
   );
+  const aiScriptPath = app.isPackaged
+    ? path.join(process.resourcesPath, "ai", "align_lyrics.py")
+    : path.join(process.cwd(), "ai", "align_lyrics.py");
+  console.log("[init] AI script path:", aiScriptPath);
+  console.log("[init] Script exists:", existsSync(aiScriptPath));
   const aiLyricsService = new AiLyricsService(
     library,
     dataDirectory,
-    path.join(currentDirectory, "../ai/align_lyrics.py"),
+    aiScriptPath,
     (progress) => mainWindow?.webContents.send("media:progress", progress),
     offlineDirectory
   );

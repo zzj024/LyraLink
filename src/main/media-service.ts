@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { createReadStream, existsSync } from "node:fs";
 import { copyFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { youtubeDl } from "youtube-dl-exec";
+import { create as createYoutubeDl } from "youtube-dl-exec";
 import type {
   ImportProgress,
   MediaPreview,
@@ -20,6 +20,19 @@ interface YtDlpMetadata {
   duration?: number;
   thumbnail?: string;
   webpage_url?: string;
+}
+
+function directNetworkEnvironment(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  // A stale system proxy (commonly 127.0.0.1:7892 after a proxy app exits)
+  // makes yt-dlp fail before it can contact the source website. Downloads
+  // should work without requiring a local proxy service to be running.
+  for (const name of [
+    "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"
+  ]) {
+    delete env[name];
+  }
+  return env;
 }
 
 function safeFileName(value: string): string {
@@ -87,28 +100,40 @@ async function downloadCover(url: string | null, destination: string): Promise<s
 
 export class MediaService {
   private readonly activeImports = new Set<string>();
+  private readonly youtubeDl;
   constructor(
     private readonly library: TrackLibrary,
     private readonly report: (progress: ImportProgress) => void,
-    private readonly ffmpegCommand = "ffmpeg"
-  ) {}
+    private readonly ffmpegCommand = "ffmpeg",
+    ytDlpCommand?: string
+  ) {
+    // electron-builder moves executables out of app.asar. An explicit path
+    // avoids trying to spawn the virtual app.asar path in packaged builds.
+    this.youtubeDl = createYoutubeDl(ytDlpCommand || "yt-dlp");
+  }
 
   private async metadata(parsed: ParsedLink): Promise<MediaPreview> {
-    const raw = await youtubeDl(parsed.url, {
-      dumpSingleJson: true,
-      noWarnings: true,
-      noPlaylist: true,
-      skipDownload: true
-    }) as unknown as YtDlpMetadata;
+    try {
+      const raw = await this.youtubeDl(parsed.url, {
+        dumpSingleJson: true,
+        noWarnings: true,
+        noPlaylist: true,
+        skipDownload: true
+      }, { env: directNetworkEnvironment() }) as unknown as YtDlpMetadata;
 
-    return {
-      platform: parsed.platform,
-      url: raw.webpage_url || parsed.url,
-      title: raw.title?.trim() || "未命名音频",
-      author: raw.uploader?.trim() || raw.channel?.trim() || "未知作者",
-      duration: typeof raw.duration === "number" ? raw.duration : null,
-      thumbnail: raw.thumbnail || null
-    };
+      return {
+        platform: parsed.platform,
+        url: raw.webpage_url || parsed.url,
+        title: raw.title?.trim() || "未命名音频",
+        author: raw.uploader?.trim() || raw.channel?.trim() || "未知作者",
+        duration: typeof raw.duration === "number" ? raw.duration : null,
+        thumbnail: raw.thumbnail || null
+      };
+    } catch (error) {
+      const errDetail = error instanceof Error ? error.message : String(error);
+      console.error("[metadata] 获取视频信息失败:", errDetail);
+      throw new Error(`获取视频信息失败: ${errDetail}`);
+    }
   }
 
   async importAudio(input: string, confirmedAuthorized: boolean, taskId?: string): Promise<Track> {
@@ -136,15 +161,18 @@ export class MediaService {
         stage: "downloading", message: "正在获取最高质量原始音轨，不进行二次转码…",
         taskId, title: preview.title, percent: 15
       });
-      const download = youtubeDl.exec(parsed.url, {
+      const download = this.youtubeDl.exec(parsed.url, {
         format: "bestaudio/best",
         noPlaylist: true,
         noWarnings: true,
         output: outputTemplate
-      });
+      }, { env: directNetworkEnvironment() });
       let progressBuffer = "";
-      download.stderr?.on("data", (chunk) => {
-        progressBuffer = (progressBuffer + String(chunk)).slice(-4000);
+      let stderrLog = "";
+      download.stderr?.on("data", (chunk: Buffer) => {
+        const chunkStr = String(chunk);
+        stderrLog = (stderrLog + chunkStr).slice(-10000);
+        progressBuffer = (progressBuffer + chunkStr).slice(-4000);
         const matches = [...progressBuffer.matchAll(/\[download\]\s+(\d+(?:\.\d+)?)%/g)];
         const latest = matches.at(-1);
         if (!latest) return;
@@ -157,7 +185,14 @@ export class MediaService {
           percent: 15 + Math.round(downloadPercent * 0.7)
         });
       });
-      await download;
+      try {
+        await download;
+      } catch (downloadError) {
+        const errDetail = downloadError instanceof Error ? downloadError.message : String(downloadError);
+        console.error("[importAudio] 下载失败, stderr:", stderrLog);
+        console.error("[importAudio] 下载错误:", errDetail);
+        throw new Error(`下载失败: ${errDetail}\n\n详细日志:\n${stderrLog.slice(-2000)}`);
+      }
 
       const downloadedFile = (await readdir(this.library.mediaDirectory))
         .find((name) => name.startsWith(`${baseName}.`) && !name.endsWith(".part"));
@@ -197,9 +232,10 @@ export class MediaService {
         if (downloadedPath) await rm(downloadedPath, { force: true });
         if (downloadedCover) await rm(downloadedCover, { force: true });
       }
-      const message = error instanceof Error ? error.message : "导入失败";
-      this.report({ stage: "error", message, taskId, title: input });
-      throw new Error(toFriendlyError(message));
+      const rawMessage = error instanceof Error ? error.message : "导入失败";
+      console.error("[importAudio] 导入失败:", rawMessage);
+      this.report({ stage: "error", message: rawMessage, taskId, title: input });
+      throw new Error(rawMessage);
     } finally {
       if (activeKey) this.activeImports.delete(activeKey);
     }

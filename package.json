@@ -1,6 +1,6 @@
 {
   "name": "link-audio",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "private": true,
   "description": "A local-first desktop app for importing, organizing, editing and syncing authorized audio.",
   "main": "dist/main/index.js",
@@ -51,6 +51,10 @@
       {
         "from": "resources/offline",
         "to": "offline"
+      },
+      {
+        "from": "ai",
+        "to": "ai"
       }
     ],
     "asarUnpack": [
