@@ -1,4 +1,12 @@
-export type Platform = "bilibili" | "local";
+export type Platform = "bilibili" | "netease" | "joox" | "local";
+
+export interface CustomThemeConfig {
+  id: string;
+  name: string;
+  accent: string;
+  surface: string;
+  mode: "dark" | "light";
+}
 
 export interface AppSettings {
   confirmedAuthorized: boolean;
@@ -8,7 +16,17 @@ export interface AppSettings {
   rememberVolume?: boolean;
   defaultSort?: "newest" | "title" | "author" | "duration";
   showSourceColumn?: boolean;
-  theme?: "light" | "dark";
+  theme?: string;
+  closeBehavior?: "tray" | "taskbar" | "exit";
+  customTheme?: {
+    accent: string;
+    surface: string;
+    sidebar: string;
+  };
+  /** 用户创建的多个自定义主题 */
+  customThemes?: CustomThemeConfig[];
+  /** 预设主题的用户修改（按主题 id 记录颜色覆盖） */
+  themeOverrides?: Record<string, { accent: string; surface: string }>;
 }
 
 export interface ParsedLink {
@@ -32,8 +50,43 @@ export interface LyricLine {
   confidence?: number;
 }
 
+export interface OnlineSearchResult extends MediaPreview {
+  /** Canonical platform page URL, used by the existing authorized download flow. */
+  id: string;
+}
+
+export interface OnlineSearchPage {
+  items: OnlineSearchResult[];
+  page: number;
+  hasMore: boolean;
+}
+
+export interface OnlineLyricsCandidate {
+  id: string;
+  provider: string;
+  title: string;
+  author: string;
+  album: string | null;
+  duration: number | null;
+  mode: "synced" | "plain";
+}
+
+export interface DesktopLyricsState {
+  title: string;
+  author: string;
+  coverUrl: string;
+  currentLine: string;
+  nextLine: string;
+  hasLyrics: boolean;
+  isPlaying: boolean;
+  playMode: "list" | "repeat" | "shuffle";
+  locked: boolean;
+}
+
+export type DesktopLyricsAction = "previous" | "toggle" | "next" | "cycle-mode";
+
 export interface LyricsTrack {
-  source: "manual" | "ai";
+  source: "manual" | "ai" | "online";
   updatedAt: string;
   lines: LyricLine[];
 }
@@ -93,6 +146,13 @@ export interface DeletedTrack extends Track {
 export interface ImportRequest {
   input: string;
   taskId?: string;
+  /** 搜索结果里已有的元数据，避免导入时二次请求（Joox 等聚合源使用） */
+  meta?: {
+    title?: string;
+    author?: string;
+    duration?: number | null;
+    thumbnail?: string | null;
+  };
 }
 
 export interface ImportProgress {
@@ -104,6 +164,12 @@ export interface ImportProgress {
 }
 
 export interface LinkAudioApi {
+  searchBilibili(query: string, page: number): Promise<OnlineSearchPage>;
+  searchNetease(query: string, page: number): Promise<OnlineSearchPage>;
+  searchJoox(query: string, page: number): Promise<OnlineSearchPage>;
+  resolveNeteasePreview(songId: string): Promise<string>;
+  resolveStreamPreview(url: string): Promise<string>;
+  resolveBilibiliPreview(url: string): Promise<string>;
   importAudio(request: ImportRequest): Promise<Track>;
   listTracks(): Promise<Track[]>;
   deleteTrack(id: string): Promise<Track[]>;
@@ -124,6 +190,11 @@ export interface LinkAudioApi {
   revealTrack(id: string): Promise<boolean>;
   importLrc(id: string): Promise<Track | null>;
   exportLrc(id: string): Promise<boolean>;
+  fetchBilibiliLyrics(id: string): Promise<Track>;
+  autoMatchLyrics(id: string): Promise<{ track: Track; mode: "synced" | "ai"; provider: string }>;
+  searchOnlineLyrics(id: string): Promise<OnlineLyricsCandidate[]>;
+  searchLyricsByKeyword(id: string, keyword: string): Promise<OnlineLyricsCandidate[]>;
+  applyOnlineLyrics(id: string, candidateId: string): Promise<{ text: string; mode: "synced" | "plain"; provider: string }>;
   backupLibrary(): Promise<boolean>;
   restoreLibraryBackup(): Promise<boolean>;
   cleanTrash(): Promise<DeletedTrack[]>;
@@ -136,9 +207,30 @@ export interface LinkAudioApi {
   createFolder(name: string): Promise<AudioFolder[]>;
   renameFolder(id: string, name: string): Promise<AudioFolder[]>;
   deleteFolder(id: string): Promise<{ folders: AudioFolder[]; tracks: Track[] }>;
-  saveLyrics(id: string, lines: LyricLine[], source?: "manual" | "ai"): Promise<Track>;
+  saveLyrics(id: string, lines: LyricLine[], source?: "manual" | "ai" | "online"): Promise<Track>;
   alignLyrics(id: string, texts: string[]): Promise<LyricLine[]>;
+  chooseWallpaper(): Promise<{ path: string; url: string } | null>;
   getSettings(): Promise<AppSettings>;
   saveSettings(settings: AppSettings): Promise<AppSettings>;
+  openDesktopLyrics(): Promise<void>;
+  updateDesktopLyrics(state: DesktopLyricsState): void;
+  hideDesktopLyrics(): void;
+  setDesktopLyricsLocked(locked: boolean): void;
+  setDesktopLyricsSettingsOpen(open: boolean): void;
+  setDesktopLyricsClickThrough(ignore: boolean): void;
+  setDesktopLyricsCompactHeight(height: number): void;
+  controlDesktopLyrics(action: DesktopLyricsAction): void;
+  onDesktopLyricsUpdate(listener: (state: DesktopLyricsState) => void): () => void;
+  onDesktopLyricsAction(listener: (action: DesktopLyricsAction) => void): () => void;
+  onDesktopLyricsReveal(listener: () => void): () => void;
+  onDesktopLyricsPointerLeave(listener: () => void): () => void;
+  onDesktopLyricsVisibility(listener: (visible: boolean) => void): () => void;
+  minimizeWindow(): void;
+  toggleMaximizeWindow(): void;
+  closeWindow(): void;
+  onWindowMaximizedChange(listener: (maximized: boolean) => void): () => void;
+  showMainWindow(): void;
+  hideTrayMenu(): void;
+  quitApp(): void;
   onProgress(listener: (progress: ImportProgress) => void): () => void;
 }

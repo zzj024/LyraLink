@@ -2,12 +2,15 @@ import { build, context } from "esbuild";
 import { cp, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 
+// 渲染层（index/desktop-lyrics/tray-menu 三个窗口）由 Vite 构建（见 vite.config.ts），
+// 这里只负责 Electron 主进程、preload 和测试。
 const watch = process.argv.includes("--watch");
 const root = process.cwd();
 const dist = path.join(root, "dist");
 
 await rm(dist, { recursive: true, force: true });
-await mkdir(path.join(dist, "renderer"), { recursive: true });
+await mkdir(path.join(dist, "main"), { recursive: true });
+await mkdir(path.join(dist, "tests"), { recursive: true });
 await mkdir(path.join(dist, "ai"), { recursive: true });
 
 const options = [
@@ -27,14 +30,6 @@ const options = [
     platform: "node",
     format: "cjs",
     external: ["electron"],
-    sourcemap: true
-  },
-  {
-    entryPoints: ["src/renderer/app.ts"],
-    outfile: "dist/renderer/app.js",
-    bundle: true,
-    platform: "browser",
-    format: "esm",
     sourcemap: true
   },
   {
@@ -68,19 +63,25 @@ const options = [
     platform: "node",
     format: "esm",
     sourcemap: true
+  },
+  {
+    entryPoints: ["tests/legacy-migration.test.ts"],
+    outfile: "dist/tests/legacy-migration.test.js",
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    sourcemap: true
   }
 ];
 
-await cp("src/renderer/index.html", "dist/renderer/index.html");
-await cp("src/renderer/styles.css", "dist/renderer/styles.css");
-await cp("resources/icon.svg", "dist/renderer/icon.svg");
+// 主进程与桌面歌词窗口依赖的静态资源（渲染层 HTML/CSS 由 Vite 产出，含 icon.svg 经 public/ 拷贝）
 await cp("ai/align_lyrics.py", "dist/ai/align_lyrics.py");
 
 if (watch) {
   const contexts = await Promise.all(options.map((item) => context(item)));
   await Promise.all(contexts.map((item) => item.watch()));
-  console.log("Watching source files…");
+  console.log("Watching main/preload/tests…");
 } else {
   await Promise.all(options.map((item) => build(item)));
-  console.log("Build complete.");
+  console.log("Main/preload/tests build complete.");
 }

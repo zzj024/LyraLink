@@ -149,8 +149,9 @@ def _build_char_to_word_start(recognized):
 def align_lines(lines, recognized_words, duration, offset=0.0):
     """Align known lyrics to Whisper word timestamps.
 
-    For each lyrics line, finds the best matching Whisper word after the
-    previous match (order enforcement for repeated lines).
+    For each lyrics line, slides a window over consecutive recognized words
+    to find the best character-level match. This handles multi-word lines
+    correctly (e.g. Chinese lyrics where Whisper outputs individual chars).
 
     recognized_words: list of Whisper word objects with .word, .start, .end,
                       .probability attributes.
@@ -158,45 +159,67 @@ def align_lines(lines, recognized_words, duration, offset=0.0):
     """
     n = len(lines)
     raw_starts = [None] * n
+    raw_ends = [None] * n
     confidences = [0.0] * n
     prev_match_time = -1.0
+    num_words = len(recognized_words)
 
     for i, line_text in enumerate(lines):
         line_norm = normalize(line_text)
         if not line_norm:
             continue
 
-        best_time = None
+        best_start_time = None
+        best_end_time = None
         best_score = -1
         best_prob = 0.0
 
-        for word in recognized_words:
-            word_start = float(word.start)
-            # Only consider words after the previous match.
+        # Slide a window of consecutive words to find the best match.
+        for start_idx in range(num_words):
+            word_start = float(recognized_words[start_idx].start)
             if word_start < prev_match_time - 1.0:
                 continue
-            word_norm = normalize(word.word)
-            if not word_norm:
-                continue
-            score = 0
-            for j in range(min(len(line_norm), len(word_norm))):
-                if line_norm[j] == word_norm[j]:
-                    score += 1
-                else:
+
+            window_text = ""
+            window_prob_sum = 0.0
+            window_count = 0
+            end_time = word_start
+
+            for end_idx in range(start_idx, min(start_idx + 15, num_words)):
+                w = recognized_words[end_idx]
+                w_norm = normalize(w.word)
+                if not w_norm:
+                    continue
+                window_text += w_norm
+                window_prob_sum += float(w.probability or 0)
+                window_count += 1
+                end_time = float(w.end or w.start)
+
+                # Score: count matching characters in order.
+                score = 0
+                for j in range(min(len(line_norm), len(window_text))):
+                    if line_norm[j] == window_text[j]:
+                        score += 1
+                    else:
+                        break
+
+                if score >= 2 and score > best_score:
+                    best_score = score
+                    best_start_time = word_start
+                    best_end_time = end_time
+                    best_prob = window_prob_sum / max(1, window_count)
+
+                # Stop extending window once we've passed the line length.
+                if len(window_text) >= len(line_norm) + 5:
                     break
-            if score >= 2 and score > best_score:
-                best_score = score
-                best_time = word_start
-                best_prob = float(word.probability or 0)
 
         line_length = max(1, len(line_norm))
         coverage = best_score / line_length
-        if best_time is not None and best_score >= 2 and coverage >= 0.18:
-            raw_starts[i] = best_time
-            prev_match_time = best_time
+        if best_start_time is not None and best_score >= 2 and coverage >= 0.15:
+            raw_starts[i] = best_start_time
+            raw_ends[i] = best_end_time
+            prev_match_time = best_start_time
             confidences[i] = round(min(1.0, coverage * 0.75 + best_prob * 0.25), 3)
-
-    # Fill every contiguous missing section as one interval.
 
     # Fill every contiguous missing section as one interval.
     index = 0
@@ -230,12 +253,27 @@ def align_lines(lines, recognized_words, duration, offset=0.0):
             value = max(value, starts[-1] + 0.05)
         starts.append(round(value, 3))
 
+    # Build corrected end times.
+    ends = []
+    for index in range(len(lines)):
+        if raw_ends[index] is not None:
+            end_val = max(0.0, min(float(raw_ends[index]) + offset, duration))
+        elif index + 1 < len(starts):
+            end_val = starts[index + 1]
+        else:
+            end_val = round(duration, 3)
+        end_val = max(end_val, starts[index] + 0.05)
+        # Ensure end doesn't exceed next line's start.
+        if index + 1 < len(starts):
+            end_val = min(end_val, starts[index + 1])
+        ends.append(round(end_val, 3))
+
     result = []
     for index, text in enumerate(lines):
         result.append({
             "text": text,
             "start": starts[index],
-            "end": starts[index + 1] if index + 1 < len(starts) else round(duration, 3),
+            "end": ends[index],
             "confidence": confidences[index],
         })
     return result
@@ -286,7 +324,7 @@ def main():
     progress(100, "AI 歌词匹配完成")
     print(json.dumps({
         "lines": result,
-        "recognizedCharacters": len(recognized),
+        "recognizedCharacters": len(words),
         "duration": duration,
     }, ensure_ascii=False))
 

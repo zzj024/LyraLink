@@ -19,3 +19,16 @@ resources/offline/bin/ffmpeg.exe
 测试素材/*.mp3
 测试素材/*.m4a
 测试素材/*.wav
+
+# 应用内备份导出的完整音乐库（含音频与模型，体积大）
+测试素材/LinkAudio-backup-*/
+
+# 打包产物
+release/
+release2/
+release3/
+release-pkg/
+win-unpacked/
+
+# ZCode 本地目录
+.zcode/

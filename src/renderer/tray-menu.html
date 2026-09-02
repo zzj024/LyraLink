@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>LyraLink</title><link rel="stylesheet" href="tray-menu.css" /></head>
+  <body>
+    <main class="tray-card">
+      <header><div class="tray-brand"><span>L</span><div><strong>LyraLink</strong><small>正在后台播放</small></div></div><button id="tray-close" aria-label="收起">×</button></header>
+      <section class="now-playing-card">
+        <div class="tray-cover"><img id="tray-cover" alt="" /><span>♪</span></div>
+        <div class="tray-track"><small>当前歌曲</small><strong id="tray-title">暂未播放歌曲</strong><span id="tray-author">从音乐库选择一首歌曲</span></div>
+      </section>
+      <section class="tray-controls" aria-label="播放控制">
+        <button id="tray-previous" aria-label="上一首" title="上一首">⏮</button>
+        <button id="tray-toggle" class="tray-play" aria-label="播放">▶</button>
+        <button id="tray-next" aria-label="下一首" title="下一首">⏭</button>
+      </section>
+      <button id="tray-mode" class="tray-row"><span class="row-icon">⇥</span><div><strong>顺序播放</strong><small>点击切换播放模式</small></div><i>›</i></button>
+      <button id="tray-lyrics" class="tray-row"><span class="row-icon">词</span><div><strong>桌面歌词</strong><small>显示置顶歌词浮窗</small></div><i>›</i></button>
+      <footer><button id="tray-open">打开 LyraLink</button><button id="tray-exit" class="exit">退出</button></footer>
+    </main>
+    <script type="module" src="./tray-menu.ts"></script>
+  </body>
+</html>

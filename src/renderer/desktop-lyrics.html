@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LyraLink 桌面歌词</title>
+    <link rel="stylesheet" href="desktop-lyrics.css" />
+  </head>
+  <body>
+    <main id="lyrics-shell" class="lyrics-shell chrome-visible">
+      <header class="toolbar">
+        <div class="track-meta"><span id="title">LyraLink</span><span id="author"></span></div>
+        <div class="transport" aria-label="播放控制">
+          <button id="previous" aria-label="上一首" title="上一首">⏮</button>
+          <button id="toggle" class="play" aria-label="播放" title="播放">▶</button>
+          <button id="next-track" aria-label="下一首" title="下一首">⏭</button>
+          <button id="mode" class="mode" aria-label="切换播放模式" title="顺序播放">⇥</button>
+        </div>
+        <div class="window-actions">
+          <button id="settings-toggle" aria-label="歌词设置" title="歌词设置">⚙</button>
+          <button id="lock" aria-label="锁定桌面歌词" title="锁定后从主界面“词”按钮解锁">🔒</button>
+          <button id="close" aria-label="隐藏桌面歌词" title="隐藏">×</button>
+        </div>
+      </header>
+
+      <section id="lyrics" class="lyrics" aria-live="polite">
+        <p id="current" class="current">正在等待播放</p>
+        <p id="next" class="next"></p>
+        <p id="incoming" class="incoming"></p>
+      </section>
+
+      <aside id="settings-panel" class="settings-panel hidden" aria-label="歌词样式设置">
+        <div class="settings-heading"><strong>歌词样式</strong><button id="settings-close" aria-label="关闭设置">×</button></div>
+        <div class="line-count-setting">
+          <span>显示行数</span>
+          <div class="segmented"><button id="one-line" data-lines="1">单行</button><button id="two-lines" data-lines="2">双行</button></div>
+        </div>
+        <label><span>字号 <output id="font-size-value">34</output></span><input id="font-size" type="range" min="22" max="52" step="1" value="34" /></label>
+        <div class="color-row">
+          <label><span>当前歌词</span><input id="current-color" type="color" value="#efff84" /></label>
+          <label><span>下一句</span><input id="next-color" type="color" value="#ffffff" /></label>
+        </div>
+        <label><span>背景深度 <output id="background-value">72%</output></span><input id="background-opacity" type="range" min="20" max="92" step="1" value="72" /></label>
+        <button id="reset-style" class="reset-style">恢复默认</button>
+      </aside>
+    </main>
+    <script type="module" src="./desktop-lyrics.ts"></script>
+  </body>
+</html>

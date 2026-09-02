@@ -6,23 +6,31 @@
   "main": "dist/main/index.js",
   "type": "module",
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "dev": "node scripts/build.mjs --watch",
+    "build": "node scripts/build.mjs && vite build",
+    "dev": "node scripts/dev.mjs",
     "start": "electron .",
     "test": "npm run build && node --test dist/tests/*.test.js && python -m unittest discover -s ai -p \"test_*.py\"",
-    "check": "tsc --noEmit",
+    "check": "vue-tsc --noEmit -p tsconfig.renderer.json && tsc --noEmit",
     "prepare:offline": "powershell -ExecutionPolicy Bypass -File scripts/prepare-offline-runtime.ps1",
-    "dist:win": "npm run build && electron-builder --win nsis"
+    "dist:win": "npm run build && cross-env ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ electron-builder --win nsis",
+    "dev:electron": "electron ."
   },
   "dependencies": {
     "youtube-dl-exec": "^3.0.24"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "cross-env": "^10.1.0",
     "electron": "^37.0.0",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.25.0",
-    "typescript": "^5.8.0"
+    "naive-ui": "^2.45.3",
+    "pinia": "^4.0.3",
+    "typescript": "^5.8.0",
+    "vite": "^7.3.6",
+    "vue": "^3.5.42",
+    "vue-tsc": "^3.3.11"
   },
   "allowScripts": {},
   "build": {
@@ -30,7 +38,7 @@
     "productName": "LyraLink",
     "artifactName": "LyraLink-Setup-${version}.${ext}",
     "directories": {
-      "output": "release"
+      "output": "release2"
     },
     "win": {
       "icon": "resources/icon.ico",
@@ -40,7 +48,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false
     },
     "files": [
       "dist/**/*",
@@ -51,6 +60,10 @@
       {
         "from": "resources/offline",
         "to": "offline"
+      },
+      {
+        "from": "resources/icon.ico",
+        "to": "icon.ico"
       },
       {
         "from": "ai",

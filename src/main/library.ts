@@ -411,7 +411,7 @@ export class TrackLibrary {
     return remaining;
   }
 
-  async saveLyrics(id: string, lines: LyricLine[], source: "manual" | "ai" = "manual"): Promise<Track> {
+  async saveLyrics(id: string, lines: LyricLine[], source: "manual" | "ai" | "online" = "manual"): Promise<Track> {
     const tracks = await this.list();
     const target = tracks.find((track) => track.id === id);
     if (!target) throw new Error("没有找到要保存歌词的音频。");

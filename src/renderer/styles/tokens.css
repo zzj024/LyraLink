@@ -1,0 +1,85 @@
+/* ============================================================
+   LyraLink · 录音室深色 设计 tokens（草稿页定稿版）
+   ============================================================ */
+:root {
+  /* 色板（深色默认） */
+  --bg: #121311;
+  --bg-glow: radial-gradient(1200px 600px at 70% -10%, rgba(231, 255, 87, 0.05), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(255, 255, 255, 0.03), transparent 60%);
+  --panel: rgba(28, 29, 25, 0.66);
+  --panel-solid: #1a1b18;
+  --elevated: #22231f;
+  --glass-blur: blur(18px) saturate(1.2);
+  --ink: #f2f1ec;
+  --ink-2: #a2a49b;
+  --ink-3: #6c6e66;
+  --accent: #e7ff57;
+  --accent-hover: #dff34d;
+  --accent-soft: rgba(231, 255, 87, 0.09);
+  --accent-soft-2: rgba(231, 255, 87, 0.16);
+  --on-accent: #17180f;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.13);
+  --danger: #ff6b5e;
+  --danger-soft: rgba(255, 107, 94, 0.12);
+  --success: #7bd88f;
+  --warning: #f5c04e;
+  --row-hover: rgba(255, 255, 255, 0.045);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.35);
+
+  /* 形状 */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  --bg: #f2f1ea;
+  --bg-glow: radial-gradient(1200px 600px at 70% -10%, rgba(180, 200, 40, 0.1), transparent 60%);
+  --panel: rgba(255, 255, 255, 0.78);
+  --panel-solid: #ffffff;
+  --elevated: #ffffff;
+  --ink: #1b1c17;
+  --ink-2: #63665c;
+  --ink-3: #9a9d90;
+  --accent: #8fae12;
+  --accent-hover: #7f9d0f;
+  --accent-soft: rgba(143, 174, 18, 0.12);
+  --accent-soft-2: rgba(143, 174, 18, 0.2);
+  --line: rgba(20, 22, 14, 0.08);
+  --line-strong: rgba(20, 22, 14, 0.16);
+  --danger: #d9452f;
+  --danger-soft: rgba(217, 69, 47, 0.1);
+  --success: #3d9a5c;
+  --warning: #c78a1d;
+  --row-hover: rgba(20, 22, 14, 0.045);
+  --shadow-lg: 0 24px 60px rgba(40, 42, 30, 0.18), 0 2px 8px rgba(40, 42, 30, 0.1);
+  --shadow-sm: 0 8px 24px rgba(40, 42, 30, 0.12);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.6 "Segoe UI", "HarmonyOS Sans SC", "Microsoft YaHei", sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+#app { height: 100vh; }
+
+::selection { background: var(--accent-soft-2); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.num, time { font-variant-numeric: tabular-nums; }
+
+/* 通用工具类 */
+.ellip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.muted { color: var(--ink-2); }
+.faint { color: var(--ink-3); }
