@@ -1,6 +1,6 @@
 {
   "name": "link-audio",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": true,
   "description": "A local-first desktop app for importing, organizing, editing and syncing authorized audio.",
   "main": "dist/main/index.js",
